@@ -1,0 +1,80 @@
+/* Print Specific Styles */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    
+    #printContainer, #printContainer * {
+        visibility: visible;
+    }
+    
+    #printContainer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20px;
+        background: white;
+    }
+
+    /* Print typography and spacing */
+    .print-header {
+        text-align: center;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #000;
+        padding-bottom: 10px;
+    }
+
+    .print-header h1 {
+        font-size: 24px;
+        margin-bottom: 5px;
+    }
+
+    .print-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .print-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+
+    .print-table th, .print-table td {
+        border: 1px solid #000;
+        padding: 8px;
+        text-align: left;
+    }
+
+    .print-table th {
+        background-color: #f0f0f0 !important; /* Force bg color in print */
+        -webkit-print-color-adjust: exact;
+    }
+
+    .print-signatures {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 50px;
+    }
+
+    .sig-box {
+        text-align: center;
+        width: 200px;
+        border-top: 1px solid #000;
+        padding-top: 5px;
+    }
+    
+    /* Hide everything else */
+    .sidebar, .top-header, .views-wrapper, .modal-overlay, .toast-container {
+        display: none !important;
+    }
+    
+    /* Ensure colors print correctly */
+    * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
