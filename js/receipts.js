@@ -27,8 +27,11 @@ const Receipts = {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Enter Number (Receipt No / Loan No)</label>
-                            <input type="text" id="rcpt_search" class="form-control" placeholder="e.g. GF-REC-... or GF-LOAN-...">
+                            <label>Enter Search (Name or Number)</label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="rcpt_search" class="form-control" placeholder="e.g. Vignesh, 000001, GF-REC..." onkeyup="Receipts.handleSearchInput(this.value)">
+                                <div id="rcpt_searchResults" class="autocomplete-dropdown"></div>
+                            </div>
                         </div>
                     </div>
                     <div class="text-right mt-4">
@@ -61,7 +64,93 @@ const Receipts = {
             </div>
         `;
 
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const container = document.querySelector('.autocomplete-container');
+            const dropdown = document.getElementById('rcpt_searchResults');
+            if (container && dropdown && !container.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
         this.loadRecent();
+    },
+
+    handleSearchInput: async function(query) {
+        const dropdown = document.getElementById('rcpt_searchResults');
+        if (!query || query.length < 2) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        const q = query.toLowerCase();
+        try {
+            const payments = await db.getAll('payments');
+            const loans = await db.getAll('loans');
+            const customers = await db.getAll('customers');
+
+            let results = [];
+
+            // 1. Search Payments
+            payments.forEach(p => {
+                const loan = loans.find(l => l.id === p.loanId);
+                const customer = loan ? customers.find(c => c.id === loan.customerId) : null;
+                const custName = customer ? customer.fullName.toLowerCase() : '';
+                const rcptNum = (p.receiptNumber || '').toLowerCase();
+                
+                if (rcptNum.includes(q) || custName.includes(q)) {
+                    results.push({
+                        type: p.referenceNumber === 'CLOSURE' ? 'closure' : 'payment',
+                        number: p.receiptNumber,
+                        title: `${p.referenceNumber === 'CLOSURE' ? 'Closure' : 'Payment'} Receipt: ${p.receiptNumber}`,
+                        subtitle: `${customer ? customer.fullName : 'Unknown'} | Date: ${Utils.formatDate(p.paymentDate)} | ₹${p.totalAmount}`
+                    });
+                }
+            });
+
+            // 2. Search Loans (Disbursement)
+            loans.forEach(l => {
+                const customer = customers.find(c => c.id === l.customerId);
+                const custName = customer ? customer.fullName.toLowerCase() : '';
+                const loanNum = (l.loanNumber || '').toLowerCase();
+
+                if (loanNum.includes(q) || custName.includes(q)) {
+                    results.push({
+                        type: 'disbursement',
+                        number: l.loanNumber,
+                        title: `Disbursement Receipt: ${l.loanNumber}`,
+                        subtitle: `${customer ? customer.fullName : 'Unknown'} | Date: ${Utils.formatDate(l.loanDate)} | ₹${l.principal}`
+                    });
+                }
+            });
+
+            if (results.length > 0) {
+                // Show top 10 matches
+                results = results.slice(0, 10);
+                dropdown.innerHTML = results.map(r => `
+                    <div class="autocomplete-item" onclick="Receipts.selectSearchResult('${r.type}', '${r.number}')">
+                        <div class="title">${r.title}</div>
+                        <div class="subtitle">${r.subtitle}</div>
+                    </div>
+                `).join('');
+                dropdown.style.display = 'block';
+            } else {
+                dropdown.innerHTML = `<div class="autocomplete-item text-muted">No matches found</div>`;
+                dropdown.style.display = 'block';
+            }
+
+        } catch (e) {
+            console.error(e);
+        }
+    },
+
+    selectSearchResult: function(type, number) {
+        document.getElementById('rcpt_type').value = type;
+        document.getElementById('rcpt_search').value = number;
+        document.getElementById('rcpt_searchResults').style.display = 'none';
+        
+        // Auto generate receipt on click
+        this.generateReceipt();
     },
 
     loadRecent: async function() {
@@ -246,7 +335,7 @@ const Receipts = {
                         </tr>
                         <tr>
                             <td>Interest Rate</td>
-                            <td style="text-align:right;">${loan.interestRate}% per month</td>
+                            <td style="text-align:right;">${loan.interestRate}% ${loan.interestType === 'monthly' ? '(PER MONTH)' : loan.interestType === 'weekly' ? '(PER WEEK)' : loan.interestType === 'daily' ? '(PER DAY)' : loan.interestType === 'yearly' ? '(PER YEAR)' : ''}</td>
                         </tr>
                         <tr>
                             <td>Processing Fee Deducted</td>

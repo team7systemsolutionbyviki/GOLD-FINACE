@@ -83,7 +83,7 @@ const Loans = {
                             </div>
                             <div class="form-group">
                                 <label>Loan Term *</label>
-                                <select id="loanTerm" class="form-control" onchange="document.getElementById('customDateGroup').style.display = (this.value === 'custom') ? 'block' : 'none';" required>
+                                <select id="loanTerm" class="form-control" onchange="Loans.handleTermChange()" required>
                                     <option value="1">1 Month</option>
                                     <option value="3">3 Months</option>
                                     <option value="6">6 Months</option>
@@ -92,8 +92,16 @@ const Loans = {
                                 </select>
                             </div>
                             <div class="form-group" id="customDateGroup" style="display: none;">
-                                <label>Custom Due Date *</label>
-                                <input type="date" id="loanCustomDueDate" class="form-control" value="${Utils.getISODate()}">
+                                <label>Custom Due Date (DD/MM/YYYY) *</label>
+                                <input type="date" id="loanCustomDueDate" class="form-control" value="${Utils.getISODate()}" onchange="Loans.handleTermChange()">
+                            </div>
+                            <div class="form-group">
+                                <label>Calculated Due Date (DD/MM/YYYY)</label>
+                                <div class="readonly-value" id="calcDueDateDisplay" style="font-weight: 600; color: var(--primary-color);"></div>
+                            </div>
+                            <div class="form-group">
+                                <label>Total Loan Days</label>
+                                <div class="readonly-value" id="calcDueDaysDisplay"></div>
                             </div>
                             <div class="form-group">
                                 <label>Processing Fee (%)</label>
@@ -168,6 +176,49 @@ const Loans = {
                 </div>
             </form>
         `;
+        this.tempGoldItems = [];
+        this.calculateTotals();
+        
+        // Initial setup for the due date display
+        setTimeout(() => {
+            document.getElementById('loanDate').addEventListener('change', () => Loans.handleTermChange());
+            this.handleTermChange();
+        }, 100);
+    },
+
+    handleTermChange: function() {
+        const termSelect = document.getElementById('loanTerm');
+        if (!termSelect) return;
+        
+        const customGroup = document.getElementById('customDateGroup');
+        const term = termSelect.value;
+        const loanDateVal = document.getElementById('loanDate').value;
+        
+        if (!loanDateVal) return;
+        
+        let dDate = new Date(loanDateVal);
+        
+        if (term === 'custom') {
+            customGroup.style.display = 'block';
+            const customDateVal = document.getElementById('loanCustomDueDate').value;
+            if (customDateVal) {
+                dDate = new Date(customDateVal);
+            }
+        } else {
+            customGroup.style.display = 'none';
+            const months = parseInt(term);
+            dDate.setMonth(dDate.getMonth() + months);
+        }
+        
+        const finalDueDateStr = Utils.getISODate(dDate);
+        
+        // Calculate days
+        const startDate = new Date(loanDateVal);
+        const diffTime = Math.abs(dDate - startDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        document.getElementById('calcDueDateDisplay').textContent = Utils.formatDate(finalDueDateStr);
+        document.getElementById('calcDueDaysDisplay').textContent = `${diffDays} Days`;
     },
 
     openAddGoldModal: async function() {
@@ -541,7 +592,12 @@ const Loans = {
                         <td>${loan.interestRate}%</td>
                         <td><span class="badge ${isOverdue ? 'badge-danger' : 'badge-success'}">${loan.status}</span></td>
                         <td>
-                            <button class="btn btn-sm btn-outline" onclick="App.navigate('payments'); setTimeout(()=>document.getElementById('paymentSearch').value='${loan.loanNumber}', 100);">Pay</button>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn btn-sm btn-outline" onclick="App.navigate('payments'); setTimeout(()=>document.getElementById('paymentSearch').value='${loan.loanNumber}', 100);">Pay</button>
+                                <button class="btn btn-sm btn-secondary" onclick="Loans.printSchedule(${loan.id})" title="Print Due Schedule">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -571,6 +627,133 @@ const Loans = {
                     trs[i].style.display = "none";
                 }
             }
+        }
+    },
+    
+    printSchedule: async function(loanId) {
+        try {
+            const loan = await db.get('loans', loanId);
+            const customer = await db.get('customers', loan.customerId);
+            const payments = await db.getByIndex('payments', 'loanId', loanId);
+            
+            // Calculate total interest paid
+            const totalInterestPaid = payments.reduce((sum, p) => sum + (parseFloat(p.interestAmount) || 0), 0);
+            
+            const companyName = await Settings.get('companyName') || 'Gold Finance';
+            
+            let html = `
+                <div class="print-header">
+                    <h2>${companyName}</h2>
+                    <h3>PAYMENT SCHEDULE</h3>
+                </div>
+                <div class="print-row" style="margin-top: 20px;">
+                    <div><strong>Customer:</strong> ${customer.fullName}</div>
+                    <div><strong>Loan No:</strong> ${loan.loanNumber}</div>
+                </div>
+                <div class="print-row">
+                    <div><strong>Loan Amount:</strong> ${Utils.formatCurrency(loan.principal)}</div>
+                    <div><strong>Loan Date:</strong> ${Utils.formatDate(loan.loanDate)}</div>
+                </div>
+                <div class="print-row">
+                    <div><strong>Interest Rate:</strong> ${loan.interestRate}% ${loan.interestType === 'monthly' ? '(PER MONTH)' : loan.interestType === 'weekly' ? '(PER WEEK)' : loan.interestType === 'daily' ? '(PER DAY)' : loan.interestType === 'yearly' ? '(PER YEAR)' : ''}</div>
+                    <div><strong>Due Date (DD/MM/YYYY):</strong> ${Utils.formatDate(loan.dueDate)}</div>
+                </div>
+                
+                <table class="print-table" style="margin-top: 20px;">
+                    <thead>
+                        <tr>
+                            <th>Month / Installment</th>
+                            <th>Due Date (DD/MM/YYYY)</th>
+                            <th>Interest Due</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            let currentInterestPaid = totalInterestPaid;
+            let startDate = new Date(loan.loanDate);
+            let endDate = new Date(loan.dueDate);
+            
+            // If loan is overdue and no due date was set properly, cap it at 12 months for safety or today
+            if (!loan.dueDate) {
+                endDate = new Date();
+                endDate.setMonth(endDate.getMonth() + 1);
+            }
+            
+            let tempDate = new Date(startDate);
+            let monthCount = 1;
+            
+            while (tempDate < endDate) {
+                tempDate.setMonth(tempDate.getMonth() + 1);
+                
+                // Calculate interest for this 1 month
+                // Assuming monthly interest rate
+                let monthlyInterest = 0;
+                if (loan.interestType === 'monthly') {
+                    monthlyInterest = Math.round(loan.principal * (loan.interestRate / 100));
+                } else if (loan.interestType === 'yearly') {
+                    monthlyInterest = Math.round(loan.principal * (loan.interestRate / 100) / 12);
+                } else {
+                    // Fallback approximation for daily/weekly to monthly
+                    monthlyInterest = Math.round(loan.principal * (loan.interestRate / 100) * 30); // if daily rate
+                }
+                
+                let statusHtml = '';
+                if (currentInterestPaid >= monthlyInterest) {
+                    currentInterestPaid -= monthlyInterest;
+                    statusHtml = `<span style="color: green; font-weight: bold;">PAID</span>`;
+                } else {
+                    // Partially paid or unpaid
+                    if (currentInterestPaid > 0) {
+                        statusHtml = `<span style="color: orange; font-weight: bold;">PARTIAL (₹${currentInterestPaid})</span>`;
+                        currentInterestPaid = 0;
+                    } else {
+                        // Check if past date
+                        if (new Date() > tempDate) {
+                            statusHtml = `<span style="color: red; font-weight: bold;">UNPAID (OVERDUE)</span>`;
+                        } else {
+                            statusHtml = `<span>PENDING</span>`;
+                        }
+                    }
+                }
+                
+                html += `
+                    <tr>
+                        <td>Month ${monthCount}</td>
+                        <td>${Utils.formatDate(Utils.getISODate(tempDate))}</td>
+                        <td>${Utils.formatCurrency(monthlyInterest)}</td>
+                        <td>${statusHtml}</td>
+                    </tr>
+                `;
+                monthCount++;
+                
+                // Safety break
+                if (monthCount > 120) break; 
+            }
+            
+            html += `
+                    </tbody>
+                </table>
+                <div style="margin-top: 30px; text-align: center; font-size: 0.9em; color: #666;">
+                    Generated on ${Utils.formatDate(new Date())}
+                </div>
+            `;
+            
+            const printContainer = document.getElementById('printContainer');
+            if (printContainer) {
+                printContainer.innerHTML = html;
+                setTimeout(() => {
+                    window.print();
+                    setTimeout(() => {
+                        printContainer.innerHTML = '';
+                    }, 500);
+                }, 100);
+            }
+            
+        } catch (error) {
+            console.error(error);
+            Utils.showToast('Error', 'Failed to generate schedule', 'error');
         }
     }
 };

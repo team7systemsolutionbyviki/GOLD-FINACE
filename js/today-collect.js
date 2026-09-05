@@ -72,7 +72,7 @@ const TodayCollect = {
             container.innerHTML = `
                 <div class="page-header flex-between">
                     <h2>Today's Collection <span class="text-muted" style="font-size: 0.6em; margin-left: 10px;">${Utils.formatDate(new Date())}</span></h2>
-                    <button class="btn btn-secondary btn-sm" onclick="window.print()">
+                    <button class="btn btn-secondary btn-sm" onclick="Utils.printSection('view-today-collect')">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:5px;vertical-align:text-bottom;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg> Print Report
                     </button>
                 </div>

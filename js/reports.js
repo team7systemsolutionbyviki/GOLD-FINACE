@@ -47,7 +47,7 @@ const Reports = {
             <div class="card" id="reportOutput" style="display: none;">
                 <div class="card-header flex-between">
                     <h3 id="reportTitle">Report Results</h3>
-                    <button class="btn btn-icon btn-outline" onclick="window.print()" title="Print Report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
+                    <button class="btn btn-icon btn-outline" onclick="Utils.printSection('view-reports')" title="Print Report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
                 </div>
                 <div class="table-responsive" id="reportPrintArea">
                     <div class="print-header" style="display: none;">

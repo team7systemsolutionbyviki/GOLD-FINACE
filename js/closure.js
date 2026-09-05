@@ -145,7 +145,15 @@ const Closure = {
             
             const currentPrincipal = loan.principal - principalPaid;
             const accruedTotal = Utils.calculateInterest(loan.principal, loan.interestRate, loan.loanDate, Utils.getISODate(), loan.interestType || 'monthly');
-            const currentAccrued = Math.max(0, accruedTotal - interestPaid);
+            
+            let penaltyAmount = 0;
+            const targetDateStr = Utils.getISODate();
+            if (loan.dueDate && targetDateStr > loan.dueDate && currentPrincipal > 0) {
+                const penaltySetting = parseFloat(await Settings.get('latePenalty')) || 0;
+                penaltyAmount = penaltySetting;
+            }
+
+            const currentAccrued = Math.max(0, accruedTotal - interestPaid) + penaltyAmount;
 
             document.getElementById('closureDetailsArea').style.display = 'block';
             document.getElementById('close_loanId').value = loan.id;
@@ -176,7 +184,15 @@ const Closure = {
         
         const interestPaid = payments.reduce((sum, p) => sum + (parseFloat(p.interestAmount) || 0), 0);
         const accruedTotal = Utils.calculateInterest(loan.principal, loan.interestRate, loan.loanDate, targetDate, loan.interestType || 'monthly');
-        const currentAccrued = Math.max(0, accruedTotal - interestPaid);
+        
+        let penaltyAmount = 0;
+        const currentPrincipal = loan.principal - payments.reduce((sum, p) => sum + (parseFloat(p.principalAmount) || 0), 0);
+        if (loan.dueDate && targetDate > loan.dueDate && currentPrincipal > 0) {
+            const penaltySetting = parseFloat(await Settings.get('latePenalty')) || 0;
+            penaltyAmount = penaltySetting;
+        }
+
+        const currentAccrued = Math.max(0, accruedTotal - interestPaid) + penaltyAmount;
         
         document.getElementById('close_accInterest').textContent = Utils.formatCurrency(currentAccrued);
         document.getElementById('close_amountInterest').value = currentAccrued;
@@ -236,9 +252,19 @@ const Closure = {
                 }
 
                 await db.logAudit('UPDATE', 'Closure', loanId, 'Closed loan ' + loan.loanNumber);
-                
                 Utils.showToast('Success', 'Loan Successfully Closed', 'success');
-                this.render(); // Reset
+                
+                // Navigate to receipts module and auto-print
+                if (window.Receipts) {
+                    App.navigate('receipts');
+                    setTimeout(() => {
+                        document.getElementById('rcpt_type').value = 'closure';
+                        document.getElementById('rcpt_search').value = paymentData.receiptNumber;
+                        Receipts.generateReceipt();
+                    }, 200);
+                } else {
+                    this.render(); // Reset
+                }
 
             } catch (err) {
                 console.error(err);

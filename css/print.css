@@ -68,7 +68,7 @@
     }
     
     /* Hide everything else */
-    .sidebar, .top-header, .views-wrapper, .modal-overlay, .toast-container {
+    .sidebar, .top-header, .views-wrapper, .modal-overlay, .toast-container, .btn {
         display: none !important;
     }
     

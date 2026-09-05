@@ -196,10 +196,18 @@ const Payments = {
             const currentPrincipal = loan.principal - principalPaid;
             
             // Interest calculation
-            // Simplified: calculate interest from loan date to today, minus total interest paid
             const interestPaid = payments.reduce((sum, p) => sum + (parseFloat(p.interestAmount) || 0), 0);
             const accruedTotal = Utils.calculateInterest(loan.principal, loan.interestRate, loan.loanDate, Utils.getISODate(), loan.interestType || 'monthly');
-            const currentAccrued = Math.max(0, accruedTotal - interestPaid); // Prevent negative
+            
+            // Late Penalty calculation
+            let penaltyAmount = 0;
+            const targetDateStr = Utils.getISODate();
+            if (loan.dueDate && targetDateStr > loan.dueDate && currentPrincipal > 0) {
+                const penaltySetting = parseFloat(await Settings.get('latePenalty')) || 0;
+                penaltyAmount = penaltySetting;
+            }
+
+            const currentAccrued = Math.max(0, accruedTotal - interestPaid) + penaltyAmount;
 
             // Populate UI
             document.getElementById('paymentDetailsArea').style.display = 'block';
@@ -242,7 +250,15 @@ const Payments = {
         
         const interestPaid = payments.reduce((sum, p) => sum + (parseFloat(p.interestAmount) || 0), 0);
         const accruedTotal = Utils.calculateInterest(loan.principal, loan.interestRate, loan.loanDate, targetDate, loan.interestType || 'monthly');
-        const currentAccrued = Math.max(0, accruedTotal - interestPaid);
+        
+        let penaltyAmount = 0;
+        const outstandingPrincipal = loan.principal - payments.reduce((sum, p) => sum + (parseFloat(p.principalAmount) || 0), 0);
+        if (loan.dueDate && targetDate > loan.dueDate && outstandingPrincipal > 0) {
+            const penaltySetting = parseFloat(await Settings.get('latePenalty')) || 0;
+            penaltyAmount = penaltySetting;
+        }
+
+        const currentAccrued = Math.max(0, accruedTotal - interestPaid) + penaltyAmount;
         
         document.getElementById('pay_rawAccInterest').value = currentAccrued;
         document.getElementById('pay_accInterest').textContent = Utils.formatCurrency(currentAccrued);
@@ -325,14 +341,17 @@ const Payments = {
             
             Utils.showToast('Success', 'Payment recorded successfully', 'success');
             
-            // Optionally print receipt (Handled via receipts module in full flow)
+            // Navigate to receipts module and auto-print
             if (window.Receipts) {
-                // we could trigger print logic here
-                console.log("Triggering receipt print for", newId);
+                App.navigate('receipts');
+                setTimeout(() => {
+                    document.getElementById('rcpt_type').value = 'payment';
+                    document.getElementById('rcpt_search').value = paymentData.receiptNumber;
+                    Receipts.generateReceipt();
+                }, 200);
+            } else {
+                this.render();
             }
-            
-            // Re-render
-            this.render();
 
         } catch (err) {
             console.error(err);

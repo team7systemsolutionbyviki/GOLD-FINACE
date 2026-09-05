@@ -102,6 +102,10 @@ const Settings = {
                             <label>Processing Fee (%)</label>
                             <input type="number" step="0.01" id="set_processingFee" class="form-control" value="${config.processingFee || '1'}">
                         </div>
+                        <div class="form-group">
+                            <label>Late Penalty Amount (₹ per overdue loan)</label>
+                            <input type="number" step="0.01" id="set_latePenalty" class="form-control" value="${config.latePenalty || '0'}">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -144,7 +148,7 @@ const Settings = {
         const keys = [
             'companyName', 'companyAddress', 'companyPhone', 'companyEmail', 'companyGST',
             'currencySymbol', 'goldRate24K', 'goldRate22K', 'goldRate21K', 'goldRate20K', 'goldRate18K', 'interestRate', 'interestRateWeekly', 
-            'interestRateDaily', 'interestRateYearly', 'ltvPercentage', 'processingFee',
+            'interestRateDaily', 'interestRateYearly', 'ltvPercentage', 'processingFee', 'latePenalty',
             'customerPrefix', 'loanPrefix', 'receiptPrefix'
         ];
 

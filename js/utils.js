@@ -136,5 +136,23 @@ const Utils = {
     // Simple UUID generator for IDs if needed (fallback)
     generateId: function() {
         return Math.random().toString(36).substring(2, 9);
+    },
+    
+    printSection: function(elementId) {
+        const source = document.getElementById(elementId);
+        const printContainer = document.getElementById('printContainer');
+        if (source && printContainer) {
+            // Copy HTML to print container
+            printContainer.innerHTML = source.innerHTML;
+            
+            // Wait for render
+            setTimeout(() => {
+                window.print();
+                // Clear container after print dialog closes
+                setTimeout(() => {
+                    printContainer.innerHTML = '';
+                }, 500);
+            }, 100);
+        }
     }
 };
