@@ -7,6 +7,20 @@ const Backup = {
         const container = document.getElementById('view-backup-restore');
         if (!container) return;
 
+        const currentUser = Auth.getCurrentUser();
+        // Security check - Only SUPER_ADMIN can view this page
+        if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-body text-center" style="padding: 50px;">
+                        <h2 class="text-danger">Access Denied</h2>
+                        <p class="text-muted">Only the Super Administrator can access Backup & Restore.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         container.innerHTML = `
             <div class="page-header">
                 <h2>Backup & Restore</h2>

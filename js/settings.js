@@ -7,6 +7,20 @@ const Settings = {
         const container = document.getElementById('view-settings');
         if (!container) return;
 
+        const currentUser = Auth.getCurrentUser();
+        // Security check - Only SUPER_ADMIN can view this page
+        if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-body text-center" style="padding: 50px;">
+                        <h2 class="text-danger">Access Denied</h2>
+                        <p class="text-muted">Only the Super Administrator can access Settings.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         // Fetch current settings
         const settings = await db.getAll('settings');
         const config = {};

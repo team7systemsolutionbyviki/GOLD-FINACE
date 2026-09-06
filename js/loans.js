@@ -246,16 +246,17 @@ const Loans = {
                         <form id="goldItemForm">
                             <div class="form-group">
                                 <label>Item Type</label>
-                                <select id="goldType" class="form-control">
-                                    <option value="Chain">Chain</option>
-                                    <option value="Ring">Ring</option>
-                                    <option value="Bangle">Bangle</option>
-                                    <option value="Necklace">Necklace</option>
-                                    <option value="Earring">Earring</option>
-                                    <option value="Bracelet">Bracelet</option>
-                                    <option value="Coin">Coin</option>
-                                    <option value="Other">Other</option>
-                                </select>
+                                <input type="text" id="goldType" class="form-control" list="goldTypeOptions" placeholder="Select or type new...">
+                                <datalist id="goldTypeOptions">
+                                    <option value="Chain">
+                                    <option value="Ring">
+                                    <option value="Bangle">
+                                    <option value="Necklace">
+                                    <option value="Earring">
+                                    <option value="Bracelet">
+                                    <option value="Coin">
+                                    <option value="Other">
+                                </datalist>
                             </div>
                             <div class="form-group">
                                 <label>Description</label>
@@ -400,8 +401,8 @@ const Loans = {
                     <td>${item.purity}</td>
                     <td>${Utils.formatCurrency(item.appraisedValue)}</td>
                     <td>
-                        <button type="button" class="btn btn-icon btn-text text-danger" onclick="Loans.removeGoldItem('${item.id}')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        <button type="button" class="btn btn-icon btn-outline" style="color: var(--danger-color); padding: 4px 8px;" onclick="Loans.removeGoldItem('${item.id}')">
+                            <svg style="width:16px; height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                         </button>
                     </td>
                 </tr>
@@ -525,6 +526,9 @@ const Loans = {
     renderActiveLoans: async function() {
         const container = document.getElementById('view-active-loans');
         if (!container) return;
+        
+        const currentUser = Auth.getCurrentUser();
+        const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
 
         container.innerHTML = `
             <div class="page-header">
@@ -545,12 +549,18 @@ const Loans = {
                                 <th>Date</th>
                                 <th>Principal</th>
                                 <th>Int. Rate</th>
+                                ${isSuperAdmin ? '<th>Proc. Fee</th>' : ''}
+                                <th>Balance Due</th>
+                                <th>Total Paid</th>
+                                <th>Fine Paid</th>
+                                <th>Late Pay Note</th>
+                                <th>Adjustment Amt</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="activeLoansTableBody">
-                            <tr><td colspan="7" class="text-center">Loading...</td></tr>
+                            <tr><td colspan="${isSuperAdmin ? 13 : 12}" class="text-center">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -562,6 +572,9 @@ const Loans = {
 
     loadActiveLoans: async function() {
         try {
+            const currentUser = Auth.getCurrentUser();
+            const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
+            
             const allLoans = await db.getAll('loans');
             // Show Active and Overdue
             const activeLoans = allLoans.filter(l => l.status === 'ACTIVE' || l.status === 'OVERDUE');
@@ -569,7 +582,8 @@ const Loans = {
             const tbody = document.getElementById('activeLoansTableBody');
             
             if (activeLoans.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">No active loans found.</td></tr>`;
+                const colSpan = isSuperAdmin ? 13 : 12;
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted">No active loans found.</td></tr>`;
                 return;
             }
 
@@ -580,9 +594,65 @@ const Loans = {
             const custMap = {};
             customers.forEach(c => custMap[c.id] = c.fullName);
 
+            const penaltySetting = parseFloat(await Settings.get('latePenalty')) || 0;
+            const targetDateStr = Utils.getISODate();
+
             let html = '';
-            activeLoans.forEach(loan => {
+            for (const loan of activeLoans) {
                 const isOverdue = loan.status === 'OVERDUE';
+                
+                // Fetch payments for this loan to aggregate new fields
+                const payments = await db.getByIndex('payments', 'loanId', loan.id);
+                
+                let totalDuePaid = 0;
+                let totalPrincipalPaid = 0;
+                let totalFinePaid = 0;
+                let totalAdjustment = 0;
+                let adjustmentCount = 0;
+                let lastLateNote = '-';
+                
+                // Sort payments by date to get the latest note
+                payments.sort((a,b) => new Date(a.paymentDate) - new Date(b.paymentDate));
+                
+                payments.forEach(p => {
+                    totalDuePaid += (parseFloat(p.interestAmount) || 0);
+                    totalPrincipalPaid += (parseFloat(p.principalAmount) || 0);
+                    totalFinePaid += (parseFloat(p.fineAmount) || 0);
+                    const adj = (parseFloat(p.adjustmentAmount) || 0);
+                    if (adj > 0) {
+                        totalAdjustment += adj;
+                        adjustmentCount++;
+                    }
+                    if (p.lateNote && p.lateNote.trim() !== '') {
+                        lastLateNote = p.lateNote;
+                    }
+                });
+                
+                const adjustmentText = adjustmentCount > 0 ? `${Utils.formatCurrency(totalAdjustment)} (${adjustmentCount}x)` : '-';
+
+                // Calculate Balance Due
+                let currentPrincipal = loan.principal - totalPrincipalPaid;
+                const accruedTotal = Utils.calculateInterest(loan.principal, loan.interestRate, loan.loanDate, targetDateStr, loan.interestType || 'monthly');
+                let penaltyAmount = 0;
+                if (loan.dueDate && targetDateStr > loan.dueDate && currentPrincipal > 0) {
+                    penaltyAmount = penaltySetting;
+                }
+                let currentAccrued = Math.max(0, accruedTotal - totalDuePaid) + penaltyAmount;
+                
+                // Apply adjustment
+                let remainingAdjustment = totalAdjustment;
+                if (remainingAdjustment > 0) {
+                    if (currentAccrued >= remainingAdjustment) {
+                        currentAccrued -= remainingAdjustment;
+                    } else {
+                        remainingAdjustment -= currentAccrued;
+                        currentAccrued = 0;
+                        currentPrincipal = Math.max(0, currentPrincipal - remainingAdjustment);
+                    }
+                }
+                
+                const balanceDue = currentPrincipal + currentAccrued;
+
                 html += `
                     <tr>
                         <td><strong>${loan.loanNumber}</strong></td>
@@ -590,6 +660,12 @@ const Loans = {
                         <td>${Utils.formatDate(loan.loanDate)}</td>
                         <td>${Utils.formatCurrency(loan.principal)}</td>
                         <td>${loan.interestRate}%</td>
+                        ${isSuperAdmin ? `<td>${Utils.formatCurrency(loan.processingFeeAmount || 0)}</td>` : ''}
+                        <td class="text-danger" style="font-weight:bold;">${Utils.formatCurrency(balanceDue)}</td>
+                        <td class="text-success">${Utils.formatCurrency(totalDuePaid + totalPrincipalPaid + totalFinePaid)}</td>
+                        <td class="text-danger">${Utils.formatCurrency(totalFinePaid)}</td>
+                        <td><small>${lastLateNote}</small></td>
+                        <td>${adjustmentText}</td>
                         <td><span class="badge ${isOverdue ? 'badge-danger' : 'badge-success'}">${loan.status}</span></td>
                         <td>
                             <div style="display: flex; gap: 5px;">
@@ -597,17 +673,21 @@ const Loans = {
                                 <button class="btn btn-sm btn-secondary" onclick="Loans.printSchedule(${loan.id})" title="Print Due Schedule">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                                 </button>
+                                <button class="btn btn-sm" style="background:#25D366; color:white; border:none;" onclick="Loans.printSchedule(${loan.id}, true)" title="Send WhatsApp">
+                                    WA
+                                </button>
                             </div>
                         </td>
                     </tr>
                 `;
-            });
+            }
             
             tbody.innerHTML = html;
 
         } catch (error) {
             console.error(error);
-            document.getElementById('activeLoansTableBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error loading loans</td></tr>`;
+            const isSuperAdmin = Auth.getCurrentUser()?.role === 'SUPER_ADMIN';
+            document.getElementById('activeLoansTableBody').innerHTML = `<tr><td colspan="${isSuperAdmin ? 13 : 12}" class="text-center text-danger">Error loading loans</td></tr>`;
         }
     },
     
@@ -630,7 +710,7 @@ const Loans = {
         }
     },
     
-    printSchedule: async function(loanId) {
+    printSchedule: async function(loanId, isWhatsApp = false) {
         try {
             const loan = await db.get('loans', loanId);
             const customer = await db.get('customers', loan.customerId);
@@ -744,10 +824,15 @@ const Loans = {
             if (printContainer) {
                 printContainer.innerHTML = html;
                 setTimeout(() => {
-                    window.print();
-                    setTimeout(() => {
+                    if (isWhatsApp) {
+                        Utils.shareToWhatsApp('printContainer', customer ? customer.mobile : '');
                         printContainer.innerHTML = '';
-                    }, 500);
+                    } else {
+                        window.print();
+                        setTimeout(() => {
+                            printContainer.innerHTML = '';
+                        }, 500);
+                    }
                 }, 100);
             }
             

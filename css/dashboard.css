@@ -46,6 +46,7 @@
 
 .stat-details {
     flex: 1;
+    min-width: 0;
 }
 
 .stat-title {
@@ -56,9 +57,11 @@
 }
 
 .stat-value {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
     color: var(--primary-color);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .dashboard-grid {

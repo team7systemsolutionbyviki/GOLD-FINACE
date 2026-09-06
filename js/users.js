@@ -106,8 +106,9 @@ const Users = {
                                 <label>Role</label>
                                 <select id="newUserRole" class="form-control">
                                     <option value="ADMIN">ADMIN</option>
+                                    <option value="STAFF">STAFF</option>
                                 </select>
-                                <small class="text-muted mt-1" style="display:block;">Only ADMIN role can be created. SUPER_ADMIN is reserved.</small>
+                                <small class="text-muted mt-1" style="display:block;">Select ADMIN or STAFF. SUPER_ADMIN is reserved.</small>
                             </div>
                         </form>
                     </div>
@@ -139,10 +140,12 @@ const Users = {
                 return;
             }
 
+            const role = document.getElementById('newUserRole').value;
+
             const userData = {
                 username: username,
                 password: password,
-                role: 'ADMIN',
+                role: role,
                 createdAt: new Date().toISOString()
             };
 

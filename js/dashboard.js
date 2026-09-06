@@ -19,6 +19,7 @@ const Dashboard = {
                 <div class="stat-card"><div class="stat-icon icon-gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div><div class="stat-details"><div class="stat-title">Active Loans</div><div class="stat-value" id="stat-active-loans">...</div></div></div>
                 <div class="stat-card"><div class="stat-icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div><div class="stat-details"><div class="stat-title">Outstanding Principal</div><div class="stat-value" id="stat-outstanding">...</div></div></div>
                 <div class="stat-card"><div class="stat-icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div><div class="stat-details"><div class="stat-title">Today's Collection</div><div class="stat-value" id="stat-collection-today">...</div></div></div>
+                <div class="stat-card"><div class="stat-icon icon-gold" style="background-color: #ffedd5; color: #ea580c;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div><div class="stat-details"><div class="stat-title">Upcoming Due</div><div class="stat-value" id="stat-upcoming-due">...</div></div></div>
             </div>
 
             <div class="dashboard-grid">
@@ -72,6 +73,19 @@ const Dashboard = {
             const todaysPayments = payments.filter(p => p.paymentDate === todayStr);
             const totalCollectionToday = todaysPayments.reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
             document.getElementById('stat-collection-today').textContent = Utils.formatCurrency(totalCollectionToday);
+
+            // 3.5. Upcoming Due (Next 7 days)
+            const todayDate = new Date();
+            todayDate.setHours(0,0,0,0);
+            const upcomingLoans = activeLoans.filter(l => {
+                if(!l.dueDate) return false;
+                const due = new Date(l.dueDate);
+                due.setHours(0,0,0,0);
+                const diffTime = due - todayDate;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                return diffDays >= 0 && diffDays <= 7;
+            });
+            document.getElementById('stat-upcoming-due').textContent = upcomingLoans.length;
 
             // 4. Generate basic CSS Chart for Monthly Disbursements (Last 6 months)
             this.generateChart(loans);

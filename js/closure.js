@@ -25,7 +25,7 @@ const Closure = {
                         <div class="form-group">
                             <label>Enter Loan Number</label>
                             <div style="display: flex; gap: 10px;">
-                                <input type="text" id="closureSearch" class="form-control" placeholder="e.g. GF-LOAN-000001">
+                                <input type="text" id="closureSearch" class="form-control" placeholder="e.g. GF-LOAN-000001" onkeypress="if(event.key === 'Enter') Closure.searchLoan()">
                                 <button class="btn btn-primary" onclick="Closure.searchLoan()">Search</button>
                             </div>
                         </div>

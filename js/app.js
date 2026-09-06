@@ -8,7 +8,7 @@ const App = {
     
     // List of available modules (matching the data-view attributes)
     modules: [
-        'dashboard', 'today-collect', 'customers', 'new-loan', 'active-loans', 
+        'dashboard', 'due-dates', 'today-collect', 'customers', 'new-loan', 'active-loans', 
         'payments', 'loan-closure', 'gold-inventory', 'expenses', 
         'reports', 'receipts', 'backup-restore', 'settings', 'users'
     ],
@@ -173,6 +173,9 @@ const App = {
         switch(viewName) {
             case 'dashboard':
                 if (window.Dashboard) window.Dashboard.render();
+                break;
+            case 'due-dates':
+                if (window.DueDates) window.DueDates.render();
                 break;
             case 'today-collect':
                 if (window.TodayCollect) window.TodayCollect.render();

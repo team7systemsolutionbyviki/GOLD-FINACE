@@ -26,7 +26,7 @@ const Payments = {
                         <div class="form-group">
                             <label>Enter Loan Number</label>
                             <div style="display: flex; gap: 10px;">
-                                <input type="text" id="paymentSearch" class="form-control" placeholder="e.g. GF-LOAN-000001">
+                                <input type="text" id="paymentSearch" class="form-control" placeholder="e.g. GF-LOAN-000001" onkeypress="if(event.key === 'Enter') Payments.searchLoan()">
                                 <button class="btn btn-primary" onclick="Payments.searchLoan()">Search</button>
                             </div>
                         </div>
@@ -129,6 +129,22 @@ const Payments = {
                                     <input type="text" id="pay_ref" class="form-control">
                                 </div>
                             </div>
+
+                            <div class="form-grid mt-4">
+                                <div class="form-group">
+                                    <label>Fine / Penalty Amount (Optional)</label>
+                                    <input type="number" id="pay_amountFine" class="form-control" value="0" min="0" onkeyup="Payments.calcTotalPaying()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Adjustment Amount (Optional)</label>
+                                    <input type="number" id="pay_amountAdjustment" class="form-control" value="0" min="0">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group mt-4">
+                                <label>Late Pay Note (Optional)</label>
+                                <input type="text" id="pay_lateNote" class="form-control" placeholder="Enter reason for late payment or adjustment...">
+                            </div>
                             
                             <div class="text-right mt-4">
                                 <button type="submit" class="btn btn-primary" id="btnProcessPayment">Process Payment</button>
@@ -191,9 +207,11 @@ const Payments = {
             // Fetch payment history to calculate current outstanding
             const payments = await db.getByIndex('payments', 'loanId', loan.id);
             
+            const totalAdjustment = payments.reduce((sum, p) => sum + (parseFloat(p.adjustmentAmount) || 0), 0);
+            
             // Calculate total principal paid
             const principalPaid = payments.reduce((sum, p) => sum + (parseFloat(p.principalAmount) || 0), 0);
-            const currentPrincipal = loan.principal - principalPaid;
+            let currentPrincipal = loan.principal - principalPaid;
             
             // Interest calculation
             const interestPaid = payments.reduce((sum, p) => sum + (parseFloat(p.interestAmount) || 0), 0);
@@ -207,7 +225,19 @@ const Payments = {
                 penaltyAmount = penaltySetting;
             }
 
-            const currentAccrued = Math.max(0, accruedTotal - interestPaid) + penaltyAmount;
+            let currentAccrued = Math.max(0, accruedTotal - interestPaid) + penaltyAmount;
+            
+            // Apply adjustment
+            let remainingAdjustment = totalAdjustment;
+            if (remainingAdjustment > 0) {
+                if (currentAccrued >= remainingAdjustment) {
+                    currentAccrued -= remainingAdjustment;
+                } else {
+                    remainingAdjustment -= currentAccrued;
+                    currentAccrued = 0;
+                    currentPrincipal = Math.max(0, currentPrincipal - remainingAdjustment);
+                }
+            }
 
             // Populate UI
             document.getElementById('paymentDetailsArea').style.display = 'block';
@@ -248,6 +278,7 @@ const Payments = {
         const payments = await db.getByIndex('payments', 'loanId', loan.id);
         const targetDate = document.getElementById('pay_date').value;
         
+        const totalAdjustment = payments.reduce((sum, p) => sum + (parseFloat(p.adjustmentAmount) || 0), 0);
         const interestPaid = payments.reduce((sum, p) => sum + (parseFloat(p.interestAmount) || 0), 0);
         const accruedTotal = Utils.calculateInterest(loan.principal, loan.interestRate, loan.loanDate, targetDate, loan.interestType || 'monthly');
         
@@ -258,12 +289,27 @@ const Payments = {
             penaltyAmount = penaltySetting;
         }
 
-        const currentAccrued = Math.max(0, accruedTotal - interestPaid) + penaltyAmount;
+        let currentAccrued = Math.max(0, accruedTotal - interestPaid) + penaltyAmount;
+        let currentPrincipal = outstandingPrincipal;
+        
+        // Apply adjustment
+        let remainingAdjustment = totalAdjustment;
+        if (remainingAdjustment > 0) {
+            if (currentAccrued >= remainingAdjustment) {
+                currentAccrued -= remainingAdjustment;
+            } else {
+                remainingAdjustment -= currentAccrued;
+                currentAccrued = 0;
+                currentPrincipal = Math.max(0, currentPrincipal - remainingAdjustment);
+            }
+        }
         
         document.getElementById('pay_rawAccInterest').value = currentAccrued;
         document.getElementById('pay_accInterest').textContent = Utils.formatCurrency(currentAccrued);
         
-        const currentPrincipal = parseFloat(document.getElementById('pay_rawOutPrincipal').value);
+        // Wait, pay_rawOutPrincipal was taken from DOM before, but now we must update it
+        document.getElementById('pay_rawOutPrincipal').value = currentPrincipal;
+        document.getElementById('pay_outPrincipal').textContent = Utils.formatCurrency(currentPrincipal);
         document.getElementById('pay_totalOut').textContent = Utils.formatCurrency(currentPrincipal + currentAccrued);
         
         document.getElementById('pay_amountInterest').value = currentAccrued;
@@ -273,7 +319,8 @@ const Payments = {
     calcTotalPaying: function() {
         const intP = parseFloat(document.getElementById('pay_amountInterest').value) || 0;
         const prinP = parseFloat(document.getElementById('pay_amountPrincipal').value) || 0;
-        document.getElementById('pay_amountTotal').value = intP + prinP;
+        const fineP = parseFloat(document.getElementById('pay_amountFine').value) || 0;
+        document.getElementById('pay_amountTotal').value = intP + prinP + fineP;
     },
 
     renderHistory: function(payments) {
@@ -308,9 +355,12 @@ const Payments = {
 
         const prinAmt = parseFloat(document.getElementById('pay_amountPrincipal').value) || 0;
         const intAmt = parseFloat(document.getElementById('pay_amountInterest').value) || 0;
+        const fineAmt = parseFloat(document.getElementById('pay_amountFine').value) || 0;
+        const adjAmt = parseFloat(document.getElementById('pay_amountAdjustment').value) || 0;
+        const lateNote = document.getElementById('pay_lateNote').value.trim();
         const outPrin = parseFloat(document.getElementById('pay_rawOutPrincipal').value) || 0;
 
-        if (prinAmt === 0 && intAmt === 0) {
+        if (prinAmt === 0 && intAmt === 0 && fineAmt === 0) {
             Utils.showToast('Error', 'Payment amount cannot be zero', 'error');
             btn.disabled = false;
             return;
@@ -329,7 +379,10 @@ const Payments = {
             paymentDate: document.getElementById('pay_date').value,
             principalAmount: prinAmt,
             interestAmount: intAmt,
-            totalAmount: prinAmt + intAmt,
+            fineAmount: fineAmt,
+            adjustmentAmount: adjAmt,
+            lateNote: lateNote,
+            totalAmount: prinAmt + intAmt + fineAmt,
             paymentMode: document.getElementById('pay_mode').value,
             referenceNumber: document.getElementById('pay_ref').value,
             createdAt: new Date().toISOString()

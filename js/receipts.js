@@ -180,7 +180,8 @@ const Receipts = {
                         <td>${loanNo}</td>
                         <td>${Utils.formatCurrency(p.totalAmount)}</td>
                         <td>
-                            <button class="btn btn-sm btn-outline" onclick="document.getElementById('rcpt_type').value = '${p.referenceNumber === 'CLOSURE' ? 'closure' : 'payment'}'; document.getElementById('rcpt_search').value = '${p.receiptNumber}'; Receipts.generateReceipt();">Print</button>
+                            <button class="btn btn-sm btn-outline" onclick="document.getElementById('rcpt_type').value = '${p.referenceNumber === 'CLOSURE' ? 'closure' : 'payment'}'; document.getElementById('rcpt_search').value = '${p.receiptNumber}'; Receipts.generateReceipt(false);">Print</button>
+                            <button class="btn btn-sm" style="background:#25D366; color:white; border:none;" onclick="document.getElementById('rcpt_type').value = '${p.referenceNumber === 'CLOSURE' ? 'closure' : 'payment'}'; document.getElementById('rcpt_search').value = '${p.receiptNumber}'; Receipts.generateReceipt(true);">WA</button>
                         </td>
                     </tr>
                 `;
@@ -191,7 +192,7 @@ const Receipts = {
         }
     },
 
-    generateReceipt: async function() {
+    generateReceipt: async function(isWhatsApp = false) {
         const type = document.getElementById('rcpt_type').value;
         const searchVal = document.getElementById('rcpt_search').value.trim();
         
@@ -356,9 +357,15 @@ const Receipts = {
 
             printContainer.innerHTML = headerHtml + bodyHtml;
             
-            // Trigger print
+            // Trigger print or WhatsApp
             setTimeout(() => {
-                window.print();
+                if (isWhatsApp) {
+                    Utils.shareToWhatsApp('printContainer', customer ? customer.mobile : '');
+                    printContainer.innerHTML = ''; // clean up immediately
+                } else {
+                    window.print();
+                    setTimeout(() => printContainer.innerHTML = '', 500);
+                }
             }, 500);
 
         } catch(err) {

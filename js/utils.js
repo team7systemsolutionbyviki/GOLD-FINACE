@@ -154,5 +154,72 @@ const Utils = {
                 }, 500);
             }, 100);
         }
+    },
+
+    shareToWhatsApp: function(elementId, phoneNumber = '') {
+        const source = document.getElementById(elementId);
+        if (!source) return;
+
+        let text = '';
+        
+        // Try to get headers
+        const headers = source.querySelectorAll('h2, h3, .page-header h2, .receipt-header h2');
+        headers.forEach(h => { text += `*${h.innerText.trim()}*\n`; });
+        
+        text += '\n';
+
+        // Get key-value pairs (like receipt details)
+        const details = source.querySelectorAll('.receipt-details p, .form-group label, .form-group .readonly-value');
+        let currentLabel = '';
+        details.forEach(p => { 
+            const t = p.innerText.trim();
+            if (t) {
+                if (p.tagName.toLowerCase() === 'label') {
+                    currentLabel = t;
+                } else if (p.classList.contains('readonly-value') && currentLabel) {
+                    text += `${currentLabel}: ${t}\n`;
+                    currentLabel = '';
+                } else {
+                    text += `${t}\n`; 
+                }
+            }
+        });
+
+        // Get table data
+        const tables = source.querySelectorAll('table');
+        tables.forEach(table => {
+            text += '\n';
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('th, td');
+                let rowText = [];
+                cells.forEach(cell => {
+                    const cText = cell.innerText.trim().replace(/\s+/g, ' ');
+                    if (cText) rowText.push(cText);
+                });
+                if (rowText.length > 0) {
+                    text += rowText.join(' | ') + '\n';
+                }
+            });
+        });
+        
+        // Fallback if no tables or specific details found
+        if (tables.length === 0 && details.length === 0) {
+            text += source.innerText.substring(0, 1000);
+        }
+
+        const encodedText = encodeURIComponent(text.trim());
+        let url = '';
+        if (phoneNumber) {
+            // strip non-numeric from phone
+            const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+            // check if length is 10, add 91 (India) as default, otherwise keep as is
+            const finalPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+            url = `https://wa.me/${finalPhone}?text=${encodedText}`;
+        } else {
+            url = `https://wa.me/?text=${encodedText}`;
+        }
+        
+        window.open(url, '_blank');
     }
 };
