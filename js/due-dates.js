@@ -37,6 +37,7 @@ const DueDates = {
                                 <th>Principal</th>
                                 <th>Due Date (DD/MM/YYYY)</th>
                                 <th>Status</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="dueDatesTableBody">
@@ -115,6 +116,11 @@ const DueDates = {
                         <td>${Utils.formatCurrency(loan.principal)}</td>
                         <td>${Utils.formatDate(loan.dueDate).replace(/-/g, '/')}</td>
                         <td><span class="badge ${statusBadge}">${statusText}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline" style="padding: 4px 8px;" onclick="DueDates.printCustomerStatement(${loan.customerId})" title="Print Customer Statement">
+                                Print
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
@@ -183,6 +189,80 @@ const DueDates = {
                     }, 500);
                 }
             }, 100);
+        }
+    },
+
+    printCustomerStatement: async function(customerId) {
+        try {
+            const customer = await db.get('customers', customerId);
+            if (!customer) return;
+
+            const loans = await db.getByIndex('loans', 'customerId', customerId);
+            const companyName = (await Settings.get('companyName')) || 'Gold Finance';
+            const companyPhone = (await Settings.get('companyPhone')) || '';
+            
+            let html = `
+                <div class="print-header">
+                    <h1>${companyName}</h1>
+                    <p>Phone: ${companyPhone}</p>
+                    <h2 style="margin-top:10px; text-decoration:underline;">Customer Statement</h2>
+                </div>
+                <div style="margin-bottom: 20px; font-size: 14px;">
+                    <strong>Name:</strong> ${customer.fullName} <br>
+                    <strong>Contact:</strong> ${customer.mobile} <br>
+                    <strong>Customer ID:</strong> ${customer.customerCode}
+                </div>
+                <table class="print-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Loan No</th>
+                            <th>Date</th>
+                            <th>Due Date</th>
+                            <th style="text-align:right;">Principal</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            loans.sort((a,b) => new Date(b.loanDate) - new Date(a.loanDate));
+            
+            loans.forEach(l => {
+                const isPaid = l.status === 'CLOSED';
+                const statusColor = isPaid ? '#25D366' : '#d32f2f'; // Green for PAID, Red for NOT PAID
+                const statusText = isPaid ? 'PAID' : 'NOT PAID';
+                
+                html += `
+                    <tr>
+                        <td>${l.loanNumber}</td>
+                        <td>${Utils.formatDate(l.loanDate)}</td>
+                        <td>${Utils.formatDate(l.dueDate)}</td>
+                        <td style="text-align:right;">${Utils.formatCurrency(l.principal)}</td>
+                        <td style="color: ${statusColor}; font-weight: bold;">${statusText}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+                <div class="print-signatures" style="margin-top: 40px;">
+                    <div class="sig-box">Customer Signature</div>
+                    <div class="sig-box">Manager Signature</div>
+                </div>
+            `;
+            
+            const printContainer = document.getElementById('printContainer');
+            if (printContainer) {
+                printContainer.innerHTML = html;
+                window.print();
+                setTimeout(() => {
+                    printContainer.innerHTML = '';
+                }, 500);
+            }
+        } catch (e) {
+            console.error(e);
+            Utils.showToast('Error', 'Failed to generate statement', 'error');
         }
     }
 };

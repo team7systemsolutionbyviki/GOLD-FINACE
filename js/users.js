@@ -35,6 +35,7 @@ const Users = {
                         <thead>
                             <tr>
                                 <th>Username</th>
+                                <th>Password</th>
                                 <th>Role</th>
                                 <th>Created Date</th>
                                 <th>Actions</th>
@@ -60,10 +61,12 @@ const Users = {
             users.forEach(u => {
                 const isSuper = u.role === 'SUPER_ADMIN';
                 const badgeClass = isSuper ? 'badge-warning' : 'badge-primary';
+                const displayPassword = isSuper ? '<span class="text-muted">••••••••</span>' : `<span style="font-family: monospace;">${u.password}</span>`;
                 
                 html += `
                     <tr>
                         <td><strong>${u.username}</strong></td>
+                        <td>${displayPassword}</td>
                         <td><span class="badge ${badgeClass}">${u.role}</span></td>
                         <td>${Utils.formatDate(u.createdAt)}</td>
                         <td>

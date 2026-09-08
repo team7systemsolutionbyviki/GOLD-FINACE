@@ -9,7 +9,7 @@ const Gold = {
 
         container.innerHTML = `
             <div class="page-header">
-                <h2>Gold Inventory</h2>
+                <h2>Item Inventory</h2>
             </div>
             
             <div class="dashboard-stats mb-4">
@@ -49,21 +49,35 @@ const Gold = {
                         </button>
                     </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table" id="goldTable">
-                        <thead>
+                <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                    <table class="table" id="goldTable" style="min-width: 2000px; font-size: 0.85em;">
+                        <thead style="position: sticky; top: 0; background: var(--bg-color); z-index: 10;">
                             <tr>
-                                <th>Item details</th>
-                                <th>Qty</th>
-                                <th>Net Wt (g)</th>
-                                <th>Purity</th>
+                                <th>Item ID</th>
                                 <th>Loan No</th>
                                 <th>Customer</th>
+                                <th>Photo</th>
+                                <th>Material</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th>Gross Wt (g)</th>
+                                <th>Stone Wt (g)</th>
+                                <th>Net Wt (g)</th>
+                                <th>Carat</th>
+                                <th>Purity/Grade</th>
+                                <th>Rate (₹)</th>
+                                <th>Value (₹)</th>
+                                <th>LTV %</th>
+                                <th>Eligible Loan (₹)</th>
+                                <th>Storage Location</th>
+                                <th>Pledge Date</th>
+                                <th>Release Date</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
                         <tbody id="goldTableBody">
-                            <tr><td colspan="7" class="text-center">Loading...</td></tr>
+                            <tr><td colspan="20" class="text-center">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -88,9 +102,12 @@ const Gold = {
             const tbody = document.getElementById('goldTableBody');
             
             if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">No gold items in inventory</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="20" class="text-center text-muted">No items in inventory</td></tr>`;
                 return;
             }
+
+            // Fetch settings for LTV
+            const ltvPercentage = parseFloat(await Settings.get('ltvPercentage')) || 75;
 
             let pledgedWt = 0;
             let releasedWt = 0;
@@ -102,20 +119,60 @@ const Gold = {
                 const loan = loanMap[item.loanId];
                 const custName = loan ? custMap[loan.customerId] : 'Unknown';
                 const loanNo = loan ? loan.loanNumber : 'Unknown';
+                const pledgeDate = loan ? Utils.formatDate(loan.loanDate) : '—';
+                // Find when it was released (if payment reference exists), for now fallback to loan.releaseDate if available
+                const releaseDate = item.releaseDate ? Utils.formatDate(item.releaseDate) : '—';
                 
-                if (item.status === 'PLEDGED') pledgedWt += item.netWeight;
-                if (item.status === 'RELEASED') releasedWt += item.netWeight;
+                // Keep stats just for Gold/Silver metals if needed, but for now we aggregate netWeight of CALC items
+                if (item.valuationMethod === 'CALCULATED' || (!item.valuationMethod && item.netWeight)) {
+                    if (item.status === 'PLEDGED') pledgedWt += (item.netWeight || 0);
+                    if (item.status === 'RELEASED') releasedWt += (item.netWeight || 0);
+                }
 
                 const badge = item.status === 'PLEDGED' ? 'badge-warning' : 'badge-success';
+                
+                // Fallbacks for legacy records (pre-migration)
+                const material = item.material || 'Gold';
+                const gross = item.grossWeight !== undefined ? item.grossWeight.toFixed(2) : '—';
+                const stone = item.stoneWeight !== undefined ? item.stoneWeight.toFixed(2) : '—';
+                const net = item.netWeight !== undefined ? item.netWeight.toFixed(2) : '—';
+                const carat = item.caratWeight !== undefined ? item.caratWeight.toFixed(2) : '—';
+                
+                let purityStr = item.purity || '—';
+                if (material === 'Diamond') purityStr = `${item.color||''} ${item.clarity||''} ${item.cut||''}`.trim() || '—';
+                if (material === 'Ruby' || material === 'Stone') purityStr = item.rubyType || item.stoneType || '—';
+                if (material === 'Other') purityStr = item.otherName || '—';
+                
+                const rate = item.ratePerGram !== undefined ? Utils.formatCurrency(item.ratePerGram) : '—';
+                
+                const val = (item.valuationMethod === 'CALCULATED' ? item.calculatedValue : item.appraisedValue) || item.appraisedValue || 0; // fallback to appraisedValue from v1
+                
+                const itemEligibleLoan = Math.floor(val * (ltvPercentage / 100));
+
+                let photoHtml = item.itemPhoto ? `<img src="${item.itemPhoto.data}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="App.openPhotoViewer('${item.itemPhoto.data}', '${material}', '${item.type}', '${loanNo}')">` : '<span class="text-muted">—</span>';
 
                 html += `
                     <tr data-status="${item.status}">
-                        <td><strong>${item.type}</strong><br><small class="text-muted">${item.description || ''}</small></td>
-                        <td>${item.qty}</td>
-                        <td>${item.netWeight.toFixed(2)}</td>
-                        <td>${item.purity}</td>
+                        <td>${item.id}</td>
                         <td>${loanNo}</td>
-                        <td>${custName}</td>
+                        <td title="${custName}">${custName.length > 15 ? custName.substring(0, 15) + '...' : custName}</td>
+                        <td>${photoHtml}</td>
+                        <td>${material}</td>
+                        <td>${item.type}</td>
+                        <td title="${item.description||''}">${(item.description||'').length > 15 ? item.description.substring(0,15)+'...' : (item.description||'—')}</td>
+                        <td>${item.qty}</td>
+                        <td>${gross}</td>
+                        <td>${stone}</td>
+                        <td>${net}</td>
+                        <td>${carat}</td>
+                        <td>${purityStr}</td>
+                        <td>${rate}</td>
+                        <td>${Utils.formatCurrency(val)}</td>
+                        <td>${ltvPercentage}%</td>
+                        <td>${Utils.formatCurrency(itemEligibleLoan)}</td>
+                        <td>${item.storageLocation || '—'}</td>
+                        <td>${pledgeDate}</td>
+                        <td>${releaseDate}</td>
                         <td><span class="badge ${badge}">${item.status}</span></td>
                     </tr>
                 `;
@@ -164,7 +221,7 @@ const Gold = {
         
         const printContent = `
             <div class="print-header">
-                <h1>Gold Inventory Report</h1>
+                <h1>Item Inventory Report</h1>
                 <p>Status: ${statusFilter} | Date: ${dateStr}</p>
             </div>
             ${tableHtml}

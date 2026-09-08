@@ -3,7 +3,7 @@
  */
 
 const DB_NAME = 'GoldFinanceDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class Database {
     constructor() {
@@ -82,6 +82,11 @@ class Database {
                     const auditStore = db.createObjectStore('auditLogs', { keyPath: 'id', autoIncrement: true });
                     auditStore.createIndex('timestamp', 'timestamp', { unique: false });
                     auditStore.createIndex('module', 'module', { unique: false });
+                }
+
+                // Material Configs (Added in v2)
+                if (!db.objectStoreNames.contains('materialConfigs')) {
+                    db.createObjectStore('materialConfigs', { keyPath: 'type' });
                 }
             };
         });

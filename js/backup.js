@@ -8,8 +8,8 @@ const Backup = {
         if (!container) return;
 
         const currentUser = Auth.getCurrentUser();
-        // Security check - Only SUPER_ADMIN can view this page
-        if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
+        // Security check - SUPER_ADMIN and ADMIN can view this page
+        if (!currentUser || !['SUPER_ADMIN', 'ADMIN'].includes(currentUser.role)) {
             container.innerHTML = `
                 <div class="card">
                     <div class="card-body text-center" style="padding: 50px;">
@@ -72,9 +72,11 @@ const Backup = {
                 </div>
             </div>
 
+            ${currentUser.role === 'SUPER_ADMIN' ? `
             <div class="card mt-4 border-danger" style="border-color: var(--danger-color);">
-                <div class="card-header">
+                <div class="card-header flex-between">
                     <h3 class="text-danger">Danger Zone</h3>
+                    <span class="badge badge-danger">ONLY SUPER ADMIN CAN SEE THIS</span>
                 </div>
                 <div class="card-body flex-between">
                     <div>
@@ -84,6 +86,7 @@ const Backup = {
                     <button class="btn btn-danger" onclick="Backup.clearDatabase()">Clear Database</button>
                 </div>
             </div>
+            ` : ''}
             
             <div id="restorePreviewArea" class="mt-4" style="display: none;"></div>
         `;

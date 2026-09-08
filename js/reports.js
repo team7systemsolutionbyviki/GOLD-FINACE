@@ -21,6 +21,7 @@ const Reports = {
                         <div class="form-group">
                             <label>Report Type</label>
                             <select id="rep_type" class="form-control" onchange="Reports.toggleFilters()">
+                                <option value="all">All In One Report</option>
                                 <option value="collection">Collection Report</option>
                                 <option value="loan">Loan Status Report</option>
                                 <option value="customer">Customer List</option>
@@ -60,11 +61,13 @@ const Reports = {
                         <h2 id="printReportTitle">Report</h2>
                         <p id="printDateRange"></p>
                     </div>
-                    <table class="table print-table" id="reportTable">
-                        <thead id="reportTableHead"></thead>
-                        <tbody id="reportTableBody"></tbody>
-                        <tfoot id="reportTableFoot" style="font-weight: bold; background-color: var(--bg-color);"></tfoot>
-                    </table>
+                    <div id="reportTableContainer">
+                        <table class="table print-table" id="reportTable">
+                            <thead id="reportTableHead"></thead>
+                            <tbody id="reportTableBody"></tbody>
+                            <tfoot id="reportTableFoot" style="font-weight: bold; background-color: var(--bg-color);"></tfoot>
+                        </table>
+                    </div>
                 </div>
             </div>
         `;
@@ -104,7 +107,23 @@ const Reports = {
 
         let title = '';
         try {
+            // Ensure container has default table if single report is run after 'all'
+            const container = document.getElementById('reportTableContainer');
+            if (container && type !== 'all') {
+                container.innerHTML = `
+                    <table class="table print-table" id="reportTable">
+                        <thead id="reportTableHead"></thead>
+                        <tbody id="reportTableBody"></tbody>
+                        <tfoot id="reportTableFoot" style="font-weight: bold; background-color: var(--bg-color);"></tfoot>
+                    </table>
+                `;
+            }
+
             switch(type) {
+                case 'all':
+                    title = 'All In One Report';
+                    await this.runAllInOneReport(start, end);
+                    break;
                 case 'collection':
                     title = 'Collection Report';
                     await this.runCollectionReport(start, end);
@@ -136,6 +155,39 @@ const Reports = {
             console.error(err);
             Utils.showToast('Error', 'Failed to generate report', 'error');
         }
+    },
+
+    runAllInOneReport: async function(start, end) {
+        const container = document.getElementById('reportTableContainer');
+        if (!container) return;
+        let combinedHtml = '';
+
+        const captureTable = async (name, runFn) => {
+            container.innerHTML = `
+                <table class="table print-table" id="reportTable">
+                    <thead id="reportTableHead"></thead>
+                    <tbody id="reportTableBody"></tbody>
+                    <tfoot id="reportTableFoot" style="font-weight: bold; background-color: var(--bg-color);"></tfoot>
+                </table>
+            `;
+            await runFn();
+            const tableHtml = document.getElementById('reportTable').outerHTML;
+            return `<h3 style="margin-top: 30px; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">${name}</h3>` + tableHtml;
+        };
+
+        combinedHtml += await captureTable('Collection Report', () => this.runCollectionReport(start, end));
+        combinedHtml += await captureTable('Loan Status Report', () => this.runLoanReport(start, end));
+        combinedHtml += await captureTable('Expense Report', () => this.runExpenseReport(start, end));
+        combinedHtml += await captureTable('Customer List', () => this.runCustomerReport());
+        combinedHtml += await captureTable('Gold Inventory Report', () => this.runGoldReport());
+
+        container.innerHTML = combinedHtml + `
+            <table class="table print-table" id="reportTable" style="display:none;">
+                <thead id="reportTableHead"></thead>
+                <tbody id="reportTableBody"></tbody>
+                <tfoot id="reportTableFoot"></tfoot>
+            </table>
+        `;
     },
 
     runCollectionReport: async function(start, end) {
@@ -328,21 +380,30 @@ const Reports = {
     },
     
     exportCSV: function() {
-        const table = document.getElementById('reportTable');
-        if (!table) return;
+        const tables = document.querySelectorAll('.print-table');
+        if (!tables.length) return;
         
         let csv = [];
-        const rows = table.querySelectorAll('tr');
         
-        for (let i = 0; i < rows.length; i++) {
-            let row = [], cols = rows[i].querySelectorAll('td, th');
-            for (let j = 0; j < cols.length; j++) {
-                // Escape quotes and commas
-                let data = cols[j].innerText.replace(/"/g, '""');
-                row.push('"' + data + '"');
+        tables.forEach(table => {
+            if (table.style.display === 'none') return;
+            
+            const h3 = table.previousElementSibling;
+            if (h3 && h3.tagName === 'H3') {
+                csv.push('"' + h3.innerText.replace(/"/g, '""') + '"');
             }
-            csv.push(row.join(','));
-        }
+
+            const rows = table.querySelectorAll('tr');
+            for (let i = 0; i < rows.length; i++) {
+                let row = [], cols = rows[i].querySelectorAll('td, th');
+                for (let j = 0; j < cols.length; j++) {
+                    let data = cols[j].innerText.replace(/"/g, '""');
+                    row.push('"' + data + '"');
+                }
+                csv.push(row.join(','));
+            }
+            csv.push(""); 
+        });
         
         const csvFile = new Blob([csv.join('\n')], {type: "text/csv"});
         const downloadLink = document.createElement("a");

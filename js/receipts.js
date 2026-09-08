@@ -289,20 +289,37 @@ const Receipts = {
                 const goldItems = await db.getByIndex('goldItems', 'loanId', loan.id);
                 
                 let goldHtml = '';
-                let totalNet = 0;
+                let totalValue = 0;
                 goldItems.forEach(g => {
-                    totalNet += g.netWeight;
+                    const val = (g.valuationMethod === 'CALCULATED' ? g.calculatedValue : g.appraisedValue) || g.appraisedValue || 0;
+                    totalValue += val;
+                    
+                    let weightStr = '-';
+                    if (g.valuationMethod === 'CALCULATED') {
+                        weightStr = `N: ${g.netWeight !== undefined ? g.netWeight.toFixed(2) : '-'}g`;
+                    } else if (g.caratWeight) {
+                        weightStr = `${g.caratWeight.toFixed(2)} ct`;
+                    } else if (g.weight) {
+                        weightStr = `${g.weight} ${g.weightUnit}`;
+                    }
+                    
+                    let purityStr = g.purity || '-';
+                    if (g.material === 'Diamond') purityStr = `${g.color||''} ${g.clarity||''} ${g.cut||''}`.trim() || '-';
+                    if (g.material === 'Ruby' || g.material === 'Stone') purityStr = g.rubyType || g.stoneType || '-';
+                    if (g.material === 'Other') purityStr = g.otherName || '-';
+
                     goldHtml += `<tr>
-                        <td>${g.type} - ${g.description}</td>
+                        <td>${g.material || 'Gold'} - ${g.type} ${g.description ? '('+g.description+')' : ''}</td>
                         <td>${g.qty}</td>
-                        <td>${g.grossWeight.toFixed(2)}</td>
-                        <td>${g.netWeight.toFixed(2)}</td>
-                        <td>${g.purity}</td>
+                        <td>${weightStr}</td>
+                        <td>${purityStr}</td>
+                        <td>${g.valuationMethod || 'CALCULATED'}</td>
+                        <td style="text-align:right;">${Utils.formatCurrency(val)}</td>
                     </tr>`;
                 });
 
                 bodyHtml = `
-                    <h2 style="text-align:center; margin-bottom: 20px; text-decoration: underline;">GOLD LOAN DISBURSEMENT RECEIPT</h2>
+                    <h2 style="text-align:center; margin-bottom: 20px; text-decoration: underline;">LOAN DISBURSEMENT RECEIPT</h2>
                     
                     <div class="print-row">
                         <div><strong>Loan No:</strong> ${loan.loanNumber}</div>
@@ -316,15 +333,15 @@ const Receipts = {
                         <strong>Address:</strong> ${customer.address || ''}, ${customer.city || ''}
                     </div>
                     
-                    <h4 style="margin-bottom: 5px;">Pledged Gold Details</h4>
+                    <h4 style="margin-bottom: 5px;">Pledged Item Details</h4>
                     <table class="print-table">
                         <tr>
-                            <th>Item</th><th>Qty</th><th>Gross Wt (g)</th><th>Net Wt (g)</th><th>Purity</th>
+                            <th>Item</th><th>Qty</th><th>Weight/Carat</th><th>Purity/Grade</th><th>Method</th><th style="text-align:right;">Value</th>
                         </tr>
                         ${goldHtml}
                         <tr>
-                            <td colspan="3" style="text-align:right; font-weight:bold;">Total Net Weight:</td>
-                            <td colspan="2" style="font-weight:bold;">${totalNet.toFixed(2)} g</td>
+                            <td colspan="5" style="text-align:right; font-weight:bold;">Total Pledged Value:</td>
+                            <td style="font-weight:bold; text-align:right;">${Utils.formatCurrency(totalValue)}</td>
                         </tr>
                     </table>
                     

@@ -141,14 +141,9 @@ h1, h2, h3, h4, h5, h6 {
 .logo-small {
     width: 32px;
     height: 32px;
-    background: linear-gradient(135deg, var(--secondary-color), #fef08a);
-    color: #0f172a; /* Hardcoded dark navy for contrast on gold gradient */
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 16px;
+    border-radius: 50%;
+    object-fit: contain;
+    background: transparent;
     margin-right: 12px;
 }
 
@@ -662,20 +657,14 @@ select.form-control {
 }
 
 .brand-logo-large {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, #d4af37, #fef08a, #d4af37);
-    background-size: 200% 200%;
-    color: #020617;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    font-weight: 800;
-    margin-bottom: 30px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: contain;
+    background: transparent;
+    margin-bottom: 20px;
     box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4);
-    animation: gradientShift 3s ease infinite, float 6s ease-in-out infinite;
+    animation: float 6s ease-in-out infinite;
 }
 
 .brand-title {
@@ -1082,4 +1071,50 @@ select.form-control {
 .autocomplete-item .subtitle {
     font-size: 0.85em;
     color: var(--text-muted);
+}
+
+/* Settings Toggle Switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+.switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+input:checked + .slider {
+    background-color: var(--success-color);
+}
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* Material Config Inputs */
+.config-code, .config-label, .config-perc {
+    min-width: 80px;
 }

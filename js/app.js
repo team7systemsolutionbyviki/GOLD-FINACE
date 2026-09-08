@@ -241,6 +241,43 @@ const App = {
         window.addEventListener('online', updateOnlineStatus);
         window.addEventListener('offline', updateOnlineStatus);
         updateOnlineStatus(); // Initial check
+    },
+
+    openPhotoViewer: function(photoData, material, type, loanNo = '') {
+        const modalId = 'itemPhotoViewerModal';
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const html = `
+            <div class="modal-overlay active" id="${modalId}" style="z-index: 9999;" onclick="if(event.target === this) this.remove()">
+                <div class="modal" style="max-width: 90vw; background: transparent; box-shadow: none; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <div style="background: var(--surface-color); padding: 15px; border-radius: var(--radius-md); max-width: 100%; position: relative;">
+                        <button type="button" onclick="document.getElementById('${modalId}').remove()" style="position: absolute; top: -15px; right: -15px; width: 30px; height: 30px; border-radius: 50%; background: var(--surface-color); border: 2px solid var(--border-color); cursor: pointer; font-weight: bold; color: var(--text-main); box-shadow: var(--shadow-sm); z-index: 10;">&times;</button>
+                        
+                        <div style="margin-bottom: 10px; color: var(--text-main); font-size: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                            <strong>Material:</strong> ${material || 'N/A'} <br>
+                            <strong>Item:</strong> ${type || 'N/A'}
+                            ${loanNo ? `<br><strong>Loan No:</strong> ${loanNo}` : ''}
+                        </div>
+
+                        <div style="display: flex; justify-content: center; overflow: hidden; border-radius: var(--radius-sm);">
+                            <img src="${photoData}" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+        // Add ESC key listener
+        const escListener = (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById(modalId);
+                if (modal) modal.remove();
+                document.removeEventListener('keydown', escListener);
+            }
+        };
+        document.addEventListener('keydown', escListener);
     }
 };
 
