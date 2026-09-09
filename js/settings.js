@@ -213,6 +213,11 @@ const Settings = {
         return setting ? setting.value : null;
     },
     
+    // Quick helper to save a specific setting
+    set: async function(key, value) {
+        return db.put('settings', { key: key, value: value, updatedAt: new Date().toISOString() });
+    },
+    
     // Generate some demo data for testing
     generateDemoData: async function() {
         Utils.confirmDialog('Generate Demo Data', 'This will add dummy customers and loans. Proceed?', async () => {
